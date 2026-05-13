@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.sample.camerapreview" version="1.0.0"
+    xmlns="http://www.w3.org/ns/widgets"
+    xmlns:cdv="http://cordova.apache.org/ns/1.0">
+
+    <name>Camera Preview Sample</name>
+    <description>Sample app to verify cordova-plugin-camera-preview on cordova-ios 8</description>
+    <author email="dev@sample.com" href="http://sample.com">Sample Dev</author>
+
+    <content src="index.html" />
+
+    <access origin="*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+
+    <!-- Plugin dari fork repo — ini yang di-verify -->
+    <plugin name="cordova-plugin-camera-preview"
+            spec="git+https://github.com/Bobbsskuyy/cordova-plugin-camera-preview.git#master">
+        <param name="CAMERA_USAGE_DESCRIPTION" value="This app needs camera access for preview" />
+    </plugin>
+
+    <plugin name="cordova-plugin-device" spec="^3.0.0" />
+    <plugin name="cordova-plugin-whitelist" spec="^1.3.5" />
+
+    <platform name="ios">
+        <!-- Minimum iOS 13 sesuai requirement cordova-ios 8 -->
+        <preference name="deployment-target" value="13.0" />
+        <preference name="SwiftVersion" value="5" />
+        <preference name="WKWebViewOnly" value="true" />
+        <preference name="BackgroundColor" value="0x00000000" />
+
+        <!-- Required permissions untuk camera preview -->
+        <edit-config target="NSCameraUsageDescription" file="*-Info.plist" mode="merge">
+            <string>This app needs camera access to show camera preview</string>
+        </edit-config>
+    </platform>
+
+    <preference name="DisallowOverscroll" value="true" />
+    <preference name="StatusBarOverlaysWebView" value="false" />
+
+</widget>

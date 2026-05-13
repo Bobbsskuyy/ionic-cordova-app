@@ -1,0 +1,31 @@
+{
+  "name": "camera-preview-sample-app",
+  "displayName": "Camera Preview Sample",
+  "version": "1.0.0",
+  "description": "Sample app to verify cordova-plugin-camera-preview fix for cordova-ios 8",
+  "main": "index.js",
+  "scripts": {
+    "build:ios": "cordova build ios --emulator -- CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO",
+    "clean": "cordova platform remove ios && cordova platform add ios@8"
+  },
+  "cordova": {
+    "plugins": {
+      "cordova-plugin-camera-preview": {
+        "CAMERA_USAGE_DESCRIPTION": "This app needs camera access for preview"
+      },
+      "cordova-plugin-device": {},
+      "cordova-plugin-whitelist": {}
+    },
+    "platforms": [
+      "ios"
+    ]
+  },
+  "dependencies": {
+    "cordova-plugin-device": "^3.0.0",
+    "cordova-plugin-whitelist": "^1.3.5",
+    "cordova-plugin-camera-preview": "git+https://github.com/Bobbsskuyy/cordova-plugin-camera-preview.git#master"
+  },
+  "devDependencies": {
+    "cordova": "^12.0.0"
+  }
+}

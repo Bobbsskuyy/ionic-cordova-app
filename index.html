@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' data: gap: https://ssl.gstatic.com;
+                 style-src 'self' 'unsafe-inline';
+                 script-src 'self' 'unsafe-inline' 'unsafe-eval';" />
+    <title>Camera Preview Sample</title>
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+    <!-- Status bar — menampilkan hasil test plugin -->
+    <div id="status-bar">
+        <span id="status-text">Initializing...</span>
+    </div>
+
+    <!-- Overlay UI di atas camera preview -->
+    <div id="camera-overlay" style="display:none;">
+
+        <div id="top-controls">
+            <h3>Camera Preview Test</h3>
+            <p id="plugin-version">Plugin: Bobbsskuyy/cordova-plugin-camera-preview</p>
+        </div>
+
+        <!-- Shutter button -->
+        <div id="bottom-controls">
+            <button id="btn-switch" class="ctrl-btn" onclick="switchCamera()">🔄</button>
+            <button id="btn-capture" class="capture-btn" onclick="takePicture()">📷</button>
+            <button id="btn-flash" class="ctrl-btn" onclick="toggleFlash()">⚡</button>
+        </div>
+
+    </div>
+
+    <!-- Result overlay — tampil setelah foto diambil -->
+    <div id="result-overlay" style="display:none;">
+        <img id="captured-image" src="" alt="Captured" />
+        <div id="result-controls">
+            <button onclick="retake()">Retake</button>
+            <button onclick="confirmCapture()">✅ OK</button>
+        </div>
+    </div>
+
+    <!-- Main menu — sebelum kamera dibuka -->
+    <div id="main-menu">
+        <div id="app-info">
+            <h1>Camera Preview</h1>
+            <h2>Cordova iOS 8 Test</h2>
+            <p>Verify: <code>Bobbsskuyy/cordova-plugin-camera-preview</code></p>
+        </div>
+
+        <div id="test-results" style="display:none;">
+            <h3>Plugin Check:</h3>
+            <ul id="check-list"></ul>
+        </div>
+
+        <div id="menu-buttons">
+            <button id="btn-start-camera" class="primary-btn" onclick="startCamera()">
+                Start Camera Preview
+            </button>
+            <button class="secondary-btn" onclick="runPluginChecks()">
+                Run Plugin Checks
+            </button>
+        </div>
+
+        <div id="log-box">
+            <p id="log-text">Waiting for deviceready...</p>
+        </div>
+    </div>
+
+    <script src="cordova.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
