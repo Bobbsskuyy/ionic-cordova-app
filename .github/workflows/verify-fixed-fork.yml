@@ -35,7 +35,9 @@ jobs:
           echo "Cordova: $(cordova --version)"
 
       - name: npm install
-        run: npm install
+        run: |
+          npm cache clean --force
+          npm install
 
       - name: Add cordova-ios 8 platform
         run: |
@@ -65,6 +67,12 @@ jobs:
           else
             echo "⚠️  Cannot confirm fork source from package.json"
           fi
+
+          echo "=== Plugin delegate property check ==="
+          grep "delegate" plugins/cordova-plugin-camera-preview/src/ios/CameraRenderController.h
+          echo ""
+          echo "=== Last commit hash of installed plugin ==="
+          cat plugins/cordova-plugin-camera-preview/package.json | grep -E "version|_resolved|_from" || true
 
       # ── Static check semua 5 fix ada ──────────────────────────────
       - name: Static check — verify ALL fixes present
