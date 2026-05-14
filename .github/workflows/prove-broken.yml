@@ -1,0 +1,174 @@
+name: Prove Plugin Broken on cordova-ios 8
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  prove-broken:
+    name: Build with ORIGINAL plugin (expect failure)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Environment info
+        run: |
+          echo "Node:  $(node --version)"
+          echo "Xcode: $(xcodebuild -version | tr '\n' ' ')"
+          echo "macOS: $(sw_vers -productVersion)"
+
+      - name: Install Cordova CLI
+        run: npm install -g cordova@latest
+
+      - name: npm install
+        run: npm install
+
+      # ── Install plugin ORIGINAL dari npm (bukan fork) ──────────────
+      - name: Remove forked plugin, install ORIGINAL from npm
+        run: |
+          echo "=== Removing forked plugin ==="
+          cordova plugin remove cordova-plugin-camera-preview --nosave 2>/dev/null || true
+
+          echo ""
+          echo "=== Installing ORIGINAL plugin from npm (v0.14.0) ==="
+          cordova plugin add cordova-plugin-camera-preview@0.14.0
+
+          echo ""
+          echo "=== Plugin list ==="
+          cordova plugin list
+
+      - name: Add cordova-ios 8 platform
+        run: |
+          cordova platform remove ios --nosave 2>/dev/null || true
+          cordova platform add ios@8
+          cordova platform list
+
+      # ── Static check — buktikan fix TIDAK ADA di original ──────────
+      - name: Static check — confirm fixes are MISSING (original plugin)
+        run: |
+          FILE="plugins/cordova-plugin-camera-preview/src/ios/CameraPreview.m"
+          PLUGIN_XML="plugins/cordova-plugin-camera-preview/plugin.xml"
+
+          echo "════════════════════════════════════════════════"
+          echo "  Checking original plugin — expect MISSING fixes"
+          echo "════════════════════════════════════════════════"
+
+          echo ""
+          echo "── FIX #2: _activeRootView helper ──"
+          if grep -q '_activeRootView' "$FILE"; then
+            echo "⚠️  _activeRootView found (unexpected on original)"
+          else
+            echo "✅ CONFIRMED MISSING: _activeRootView not in original plugin"
+          fi
+
+          echo ""
+          echo "── FIX #3a: didMoveToParentViewController ──"
+          if grep -q 'didMoveToParentViewController' "$FILE"; then
+            echo "⚠️  didMoveToParentViewController found (unexpected)"
+          else
+            echo "✅ CONFIRMED MISSING: didMoveToParentViewController not in original"
+          fi
+
+          echo ""
+          echo "── FIX #3b: willMoveToParentViewController:nil ──"
+          if grep -q 'willMoveToParentViewController:nil' "$FILE"; then
+            echo "⚠️  willMoveToParentViewController:nil found (unexpected)"
+          else
+            echo "✅ CONFIRMED MISSING: willMoveToParentViewController:nil not in original"
+          fi
+
+          echo ""
+          echo "── FIX #5: plugin.xml <engines> ──"
+          if grep -q '<engines>' "$PLUGIN_XML"; then
+            echo "⚠️  <engines> found (unexpected)"
+          else
+            echo "✅ CONFIRMED MISSING: no <engines> declaration in original plugin.xml"
+          fi
+
+          echo ""
+          echo "════════════════════════════════════════════════"
+          echo "  All fixes confirmed MISSING in original plugin"
+          echo "════════════════════════════════════════════════"
+
+      # ── Build — ini yang kita expect GAGAL ─────────────────────────
+      - name: Build iOS with ORIGINAL plugin (expected to FAIL)
+        id: build_original
+        run: |
+          cordova build ios \
+            --emulator \
+            -- \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build-output.txt
+
+          echo "BUILD_EXIT_CODE=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true  # jangan stop workflow meski gagal
+        timeout-minutes: 20
+
+      # ── Analisis hasil build ────────────────────────────────────────
+      - name: Analyze build result
+        run: |
+          echo "════════════════════════════════════════════════"
+          echo "  Build Result Analysis"
+          echo "════════════════════════════════════════════════"
+
+          # Cek apakah .app terbentuk
+          APP_PATH=$(find platforms/ios/build -name "*.app" 2>/dev/null | head -1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo ""
+            echo "❌ BUILD FAILED — no .app artifact produced"
+            echo "   → Plugin CONFIRMED BROKEN on cordova-ios 8"
+            echo ""
+            echo "── Relevant errors from build log ──"
+            grep -i "error:\|warning:\|undefined\|scene\|viewcontroller" build-output.txt \
+              | head -30 || echo "(no matching lines found)"
+          else
+            echo ""
+            echo "⚠️  BUILD SUCCEEDED (unexpected)"
+            echo "   → Plugin may still work on this Xcode version"
+            echo "   → Runtime behavior on device still needs verification"
+            echo "   Artifact: $APP_PATH"
+          fi
+
+          echo ""
+          echo "════════════════════════════════════════════════"
+
+      # ── Upload build log sebagai artifact ──────────────────────────
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-original-plugin-${{ github.run_number }}
+          path: build-output.txt
+          retention-days: 7
+
+      # ── Summary ────────────────────────────────────────────────────
+      - name: Job summary
+        if: always()
+        run: |
+          echo "## 🔬 Proof: Original Plugin on cordova-ios 8" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Plugin | \`cordova-plugin-camera-preview@0.14.0\` (original npm) |" >> $GITHUB_STEP_SUMMARY
+          echo "| cordova-ios | \`8.x\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Xcode | \`$(xcodebuild -version | head -1)\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          APP_PATH=$(find platforms/ios/build -name "*.app" 2>/dev/null | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "### ❌ Build FAILED — Plugin is broken on cordova-ios 8" >> $GITHUB_STEP_SUMMARY
+            echo "Download \`build-log-original-plugin\` artifact to see full Xcode errors." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ Build succeeded — check runtime behavior on device" >> $GITHUB_STEP_SUMMARY
+          fi
