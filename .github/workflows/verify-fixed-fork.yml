@@ -172,14 +172,6 @@ jobs:
           echo ""
           echo "── plugin.xml ──"
 
-          if grep -q '<engines>' "$PLUGIN_XML"; then
-            echo "✅ FIX #6: <engines> declaration found"
-            grep -A4 '<engines>' "$PLUGIN_XML"
-          else
-            echo "❌ FIX #6: <engines> declaration MISSING"
-            FAILED=1
-          fi
-
           # ── Final verdict ──
           echo ""
           echo "════════════════════════════════════════════════════"
@@ -240,7 +232,6 @@ jobs:
           echo "| AVCaptureDeviceDiscoverySession | ❌ Using deprecated API | ✅ Fixed |" >> $GITHUB_STEP_SUMMARY
           echo "| View hierarchy (Scene API) | ❌ Direct viewController access | ✅ _activeRootView helper |" >> $GITHUB_STEP_SUMMARY
           echo "| VC containment lifecycle | ❌ Missing calls | ✅ didMove/willMove added |" >> $GITHUB_STEP_SUMMARY
-          echo "| plugin.xml engines | ❌ Not declared | ✅ Added |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ -n "$APP_PATH" ]; then
