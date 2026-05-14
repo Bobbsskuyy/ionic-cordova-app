@@ -1,0 +1,270 @@
+name: Verify Fork Plugin — cordova-ios 8 Fixed
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  verify-fixed:
+    name: Build with FORKED plugin (expect success)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Environment info
+        run: |
+          echo "Node:  $(node --version)"
+          echo "npm:   $(npm --version)"
+          echo "Xcode: $(xcodebuild -version | tr '\n' ' ')"
+          echo "macOS: $(sw_vers -productVersion)"
+
+      - name: Install Cordova CLI
+        run: |
+          npm install -g cordova@latest
+          echo "Cordova: $(cordova --version)"
+
+      - name: npm install
+        run: npm install
+
+      - name: Add cordova-ios 8 platform
+        run: |
+          cordova platform remove ios --nosave 2>/dev/null || true
+          cordova platform add ios@8
+          echo ""
+          echo "=== Platforms ==="
+          cordova platform list
+
+      # ── Confirm plugin berasal dari fork Bobbsskuyy ────────────────
+      - name: Confirm fork plugin is installed
+        run: |
+          echo "=== Installed plugins ==="
+          cordova plugin list
+          echo ""
+
+          PLUGIN_DIR="plugins/cordova-plugin-camera-preview"
+
+          if [ ! -d "$PLUGIN_DIR" ]; then
+            echo "❌ Plugin directory not found"
+            exit 1
+          fi
+
+          # Confirm fork source dari package.json
+          if grep -q "Bobbsskuyy" package.json; then
+            echo "✅ Plugin sourced from Bobbsskuyy fork (confirmed in package.json)"
+          else
+            echo "⚠️  Cannot confirm fork source from package.json"
+          fi
+
+      # ── Static check semua 5 fix ada ──────────────────────────────
+      - name: Static check — verify ALL fixes present
+        run: |
+          CAMERA_M="plugins/cordova-plugin-camera-preview/src/ios/CameraPreview.m"
+          SESSION_H="plugins/cordova-plugin-camera-preview/src/ios/CameraSessionManager.h"
+          SESSION_M="plugins/cordova-plugin-camera-preview/src/ios/CameraSessionManager.m"
+          PLUGIN_XML="plugins/cordova-plugin-camera-preview/plugin.xml"
+          FAILED=0
+
+          echo "════════════════════════════════════════════════════"
+          echo "  Static Fix Verification"
+          echo "════════════════════════════════════════════════════"
+
+          # ── CameraPreview.m fixes ──
+          echo ""
+          echo "── CameraPreview.m ──"
+
+          if grep -q '_activeRootView' "$CAMERA_M"; then
+            echo "✅ FIX #2: _activeRootView helper found"
+          else
+            echo "❌ FIX #2: _activeRootView MISSING"
+            FAILED=1
+          fi
+
+          if grep -q 'didMoveToParentViewController' "$CAMERA_M"; then
+            echo "✅ FIX #3a: didMoveToParentViewController found"
+          else
+            echo "❌ FIX #3a: didMoveToParentViewController MISSING"
+            FAILED=1
+          fi
+
+          if grep -q 'willMoveToParentViewController:nil' "$CAMERA_M"; then
+            echo "✅ FIX #3b: willMoveToParentViewController:nil found"
+          else
+            echo "❌ FIX #3b: willMoveToParentViewController:nil MISSING"
+            FAILED=1
+          fi
+
+          # ── CameraSessionManager.h fixes ──
+          echo ""
+          echo "── CameraSessionManager.h ──"
+
+          if grep -q '#import <UIKit/UIKit.h>' "$SESSION_H"; then
+            echo "✅ FIX #4a: explicit UIKit import found"
+          else
+            echo "❌ FIX #4a: UIKit import MISSING"
+            FAILED=1
+          fi
+
+          if grep -q 'AVCapturePhotoOutput' "$SESSION_H"; then
+            echo "✅ FIX #4b: AVCapturePhotoOutput found (replacing deprecated StillImageOutput)"
+          else
+            echo "❌ FIX #4b: AVCapturePhotoOutput MISSING"
+            FAILED=1
+          fi
+
+          if grep -q 'AVCapturePhotoCaptureDelegate' "$SESSION_H"; then
+            echo "✅ FIX #4c: AVCapturePhotoCaptureDelegate found"
+          else
+            echo "❌ FIX #4c: AVCapturePhotoCaptureDelegate MISSING"
+            FAILED=1
+          fi
+
+          # ── CameraSessionManager.m fixes ──
+          echo ""
+          echo "── CameraSessionManager.m ──"
+
+          if grep -q '#import <UIKit/UIKit.h>' "$SESSION_M"; then
+            echo "✅ FIX #5a: explicit UIKit import found"
+          else
+            echo "❌ FIX #5a: UIKit import MISSING"
+            FAILED=1
+          fi
+
+          if ! grep -q 'UIInterfaceOrientation' "$SESSION_M"; then
+            echo "✅ FIX #5b: UIInterfaceOrientation removed (was causing undeclared identifier error)"
+          else
+            echo "❌ FIX #5b: UIInterfaceOrientation still present — will cause Xcode 16 error"
+            FAILED=1
+          fi
+
+          if grep -q 'UIDeviceOrientation' "$SESSION_M"; then
+            echo "✅ FIX #5c: UIDeviceOrientation used (replacement for UIInterfaceOrientation)"
+          else
+            echo "❌ FIX #5c: UIDeviceOrientation not found"
+            FAILED=1
+          fi
+
+          if grep -q 'AVCaptureDeviceDiscoverySession' "$SESSION_M"; then
+            echo "✅ FIX #5d: AVCaptureDeviceDiscoverySession found (replacing deprecated devicesWithMediaType)"
+          else
+            echo "❌ FIX #5d: AVCaptureDeviceDiscoverySession MISSING"
+            FAILED=1
+          fi
+
+          if ! grep -q 'AVCaptureStillImageOutput' "$SESSION_M"; then
+            echo "✅ FIX #5e: AVCaptureStillImageOutput removed"
+          else
+            echo "❌ FIX #5e: AVCaptureStillImageOutput still present — deprecated & removed"
+            FAILED=1
+          fi
+
+          # ── plugin.xml ──
+          echo ""
+          echo "── plugin.xml ──"
+
+          if grep -q '<engines>' "$PLUGIN_XML"; then
+            echo "✅ FIX #6: <engines> declaration found"
+            grep -A4 '<engines>' "$PLUGIN_XML"
+          else
+            echo "❌ FIX #6: <engines> declaration MISSING"
+            FAILED=1
+          fi
+
+          # ── Final verdict ──
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          if [ $FAILED -eq 0 ]; then
+            echo "✅ ALL FIXES VERIFIED — proceeding to build"
+          else
+            echo "❌ SOME FIXES MISSING — build will likely fail"
+            exit 1
+          fi
+          echo "════════════════════════════════════════════════════"
+
+      # ── Build iOS ──────────────────────────────────────────────────
+      - name: Build iOS (simulator — no signing)
+        run: |
+          cordova build ios \
+            --emulator \
+            -- \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build-output.txt
+        timeout-minutes: 20
+
+      # ── Verify .app terbentuk ──────────────────────────────────────
+      - name: Verify build artifact
+        run: |
+          echo "=== Searching for .app ==="
+          find platforms/ios/build -name "*.app" 2>/dev/null
+
+          APP_PATH=$(find platforms/ios/build -name "*.app" | head -1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo ""
+            echo "❌ BUILD FAILED — no .app artifact"
+            echo ""
+            echo "── Relevant errors ──"
+            grep -i "error:" build-output.txt | head -20 || true
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ BUILD SUCCESS"
+          echo "   Artifact : $APP_PATH"
+          echo "   Size     : $(du -sh "$APP_PATH" | cut -f1)"
+
+      # ── Compare vs original broken build ──────────────────────────
+      - name: Summary — before vs after
+        if: always()
+        run: |
+          APP_PATH=$(find platforms/ios/build -name "*.app" 2>/dev/null | head -1)
+
+          echo "## 📊 Before vs After Fix" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| | Original (npm) | Fork (Bobbsskuyy) |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| UIKit import | ❌ Missing | ✅ Fixed |" >> $GITHUB_STEP_SUMMARY
+          echo "| UIInterfaceOrientation | ❌ Undeclared error | ✅ Replaced with UIDeviceOrientation |" >> $GITHUB_STEP_SUMMARY
+          echo "| AVCaptureStillImageOutput | ❌ Deprecated/removed | ✅ Replaced with AVCapturePhotoOutput |" >> $GITHUB_STEP_SUMMARY
+          echo "| AVCaptureDeviceDiscoverySession | ❌ Using deprecated API | ✅ Fixed |" >> $GITHUB_STEP_SUMMARY
+          echo "| View hierarchy (Scene API) | ❌ Direct viewController access | ✅ _activeRootView helper |" >> $GITHUB_STEP_SUMMARY
+          echo "| VC containment lifecycle | ❌ Missing calls | ✅ didMove/willMove added |" >> $GITHUB_STEP_SUMMARY
+          echo "| plugin.xml engines | ❌ Not declared | ✅ Added |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "$APP_PATH" ]; then
+            echo "### ✅ BUILD SUCCESS — Fork plugin is compatible with cordova-ios 8" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ BUILD FAILED — Check logs above" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Build info | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Plugin | \`Bobbsskuyy/cordova-plugin-camera-preview@master\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| cordova-ios | \`$(cordova platform list | grep ios | head -1)\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Xcode | \`$(xcodebuild -version | head -1)\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+
+      # ── Upload artifacts ───────────────────────────────────────────
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-fork-build-${{ github.run_number }}
+          path: |
+            build-output.txt
+            platforms/ios/build/**/*.app
+          retention-days: 7
+          if-no-files-found: warn
