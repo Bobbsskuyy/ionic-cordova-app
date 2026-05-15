@@ -1,4 +1,4 @@
-name: [Opsi B] Verify Fork — macOS 15 + Xcode 16.4
+name: Opsi B - Verify Fork — macOS 15 + Xcode 16.4
 
 on:
   push:
