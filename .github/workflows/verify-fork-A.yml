@@ -174,14 +174,48 @@ jobs:
           fi
           echo "════════════════════════════════════════════════════"
 
+      - name: Pick available simulator
+        run: |
+          echo "=== Available iOS Simulators ==="
+          xcrun simctl list devices available | grep -E "iPhone|iPad" | head -20
+
+          # Ambil simulator iPhone pertama yang available (OS apapun)
+          SIM_ID=$(xcrun simctl list devices available | grep "iPhone" | grep -v "unavailable" | head -1 | grep -oE '[A-F0-9-]{36}')
+          SIM_NAME=$(xcrun simctl list devices available | grep "iPhone" | grep -v "unavailable" | head -1 | sed 's/ (.*)//' | xargs)
+
+          echo ""
+          echo "Selected simulator: $SIM_NAME ($SIM_ID)"
+          echo "SIM_ID=$SIM_ID" >> $GITHUB_ENV
+          echo "SIM_NAME=$SIM_NAME" >> $GITHUB_ENV
+
       - name: Build iOS (simulator — no signing)
         run: |
+          # Gunakan destination dengan UDID spesifik agar tidak gagal karena nama simulator
           cordova build ios \
             --emulator \
             -- \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build-output.txt
+            CODE_SIGNING_ALLOWED=NO \
+            CORDOVA_CMDLINE_ARGS="-destination id=$SIM_ID" 2>&1 | tee build-output-raw.txt || true
+
+          # Fallback: build langsung via xcodebuild dengan destination id eksplisit
+          if ! grep -q "BUILD SUCCEEDED" build-output-raw.txt; then
+            echo "Cordova build gagal atau tidak ada output sukses, coba xcodebuild langsung..."
+            cd platforms/ios
+            xcodebuild \
+              -workspace App.xcworkspace \
+              -scheme App \
+              -configuration Debug \
+              -sdk iphonesimulator \
+              -destination "id=$SIM_ID" \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO \
+              build 2>&1 | tee ../../build-output.txt
+          else
+            cp build-output-raw.txt build-output.txt
+          fi
         timeout-minutes: 20
 
       - name: Verify build artifact
