@@ -1,4 +1,4 @@
-name: [Opsi A] Verify Fork — macOS 26 + Xcode 26.3
+name: Opsi A - Verify Fork — macOS 26 + Xcode 26.3
 
 on:
   push:
